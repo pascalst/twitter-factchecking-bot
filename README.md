@@ -1,6 +1,8 @@
 # Twitter Fact Checking Bot
 
-Hello, welcome to the Twitter fact checking bot :) Since fact checking is currently not en vouge, we build a bot to take over the role. the bot takes the tweet it is mentioned on and checks it for accuracy using state-of-the-art LLMs. If the bot is unsure, it will search the web for up-to-date information. Therefore, it is using the DuckDuckGoGo API for preserving privacy.
+Hello, welcome to the Twitter fact checking bot :) 
+
+Since fact checking is currently not en vouge, we build a bot to take over the role. the bot takes the tweet it is mentioned on and checks it for accuracy using state-of-the-art LLMs. If the bot is unsure, it will search the web for up-to-date information. Therefore, it is using the DuckDuckGoGo API for preserving privacy.
 
 ### Usage
 To active the bot please tag the bot on a tweet that you want to fact check and get an as objective as possible fact check.
@@ -16,6 +18,7 @@ The MIT License (MIT)
 =====================
 
 Copyright © `2025` `Pascal Stichler`
+
 Portions of this software are © `2023` `Greg Kamradt`.
 
 Permission is hereby granted, free of charge, to any person

@@ -1,11 +1,14 @@
+import re
 import tweepy
 from airtable import Airtable
 from datetime import datetime, timedelta
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain.tools import DuckDuckGoSearchRun
 import schedule
 import time
 import os
+
 
 # Helpful when testing locally
 from dotenv import load_dotenv
@@ -38,8 +41,9 @@ class TwitterBot:
         self.twitter_me_id = self.get_me_id()
         self.tweet_response_limit = 35 # How many tweets to respond to each time the program wakes up
 
-        # Initialize the language model w/ temperature of .5 to induce some creativity
-        self.llm = ChatOpenAI(temperature=.5, openai_api_key=OPENAI_API_KEY, model_name='gpt-4')
+        # Initialize the language model w/ temperature of .3 to induce limited creativity and mostly fact-checking
+        self.llm = ChatOpenAI(temperature=.3, openai_api_key=OPENAI_API_KEY, model_name='gpt-4')
+        self.ddg_search = DuckDuckGoSearchRun()
 
         # For statics tracking for each run. This is not persisted anywhere, just logging
         self.mentions_found = 0
@@ -48,27 +52,37 @@ class TwitterBot:
 
     # Generate a response using the language model using the template we reviewed in the jupyter notebook (see README)
     def generate_response(self, mentioned_conversation_tweet_text):
-        # It would be nice to bring in information about the links, pictures, etc. But out of scope for now
-        # Edit this prompt for your own personality!
+
+        print (f"Generating response for: {mentioned_conversation_tweet_text}")
+
         system_template = """
-            You are an incredibly wise and smart tech mad scientist from silicon valley.
-            Your goal is to give a concise prediction in response to a piece of text from the user.
-            
+            You are a highly meticulous fact-checker whose primary responsibility is to review and evaluate the accuracy of each post.
+
             % RESPONSE TONE:
 
-            - Your prediction should be given in an active voice and be opinionated
-            - Your tone should be serious w/ a hint of wit and sarcasm
-            
+            - Always polite, friendly, and respectful, fostering positive and engaging interactions.
+            - Occasionally incorporate light humor, but never at the expense of clarity or accuracy.
+
             % RESPONSE FORMAT:
 
+            - Provide concise, fact-focused responses.
             - Respond in under 200 characters
-            - Respond in two or less short sentences
             - Do not respond with emojis
-            
+            - Back up statements with verifiable sources, if necessary.
+            - Avoid speculation; redirect users to reliable resources (e.g., Wikipedia) if unsure.
+            - Indicate your confidence level (High, Medium, Low) in the response.
+
+
             % RESPONSE CONTENT:
 
-            - Include specific examples of old tech if they are relevant
-            - If you don't have an answer, say, "Sorry, my magic 8 ball isn't working right now 🔮"
+            - Prioritize accuracy and reliable information.
+            - Stay on topic and approach arguments with precision and thorough analysis.
+            - Praise users for correctly cited, lesser-known facts.
+            - Respond in the language the post is in.
+            - Maintain a politically neutral stance, emphasizing common sense and balance.
+            - If the response requires further elaboration, suggest additional resources without overwhelming the user.
+            - If you don't have an answer, say, "Sorry, the internet doesn't know this topic."
+            - Include "Confidence: [High/Medium/Low]" at the end of your response.
         """
         system_message_prompt = SystemMessagePromptTemplate.from_template(system_template)
 
@@ -81,8 +95,42 @@ class TwitterBot:
         final_prompt = chat_prompt.format_prompt(text=mentioned_conversation_tweet_text).to_messages()
         response = self.llm(final_prompt).content
         
+        # Parse the confidence level from the response
+        match = re.search(r"Confidence: (High|Medium|Low)", response)
+        confidence = match.group(1) if match else "Unknown"
+
+        print("Confidence level of response:", confidence)
+        
+        if confidence == "Unknown":
+            print("Warning: No confidence level detected in the response.")
+
+        # If confidence is low, perform web search and generate a new response
+        if confidence == "Low":
+            print("Low confidence detected. Performing web search...")
+            search_results = self.web_search(mentioned_conversation_tweet_text)
+            print(f"Web search results: {search_results[:3]}")
+
+            # Add search results to the new prompt
+            search_context = f"Relevant web search results:\n{search_results[:3]}\n\n"
+            updated_prompt = f"{search_context}{mentioned_conversation_tweet_text}"
+
+            # Regenerate response with additional context
+            final_prompt = chat_prompt.format_prompt(text=updated_prompt).to_messages()
+            response = self.llm(final_prompt).content
+        
+        response = re.sub(r"Confidence: (High|Medium|Low)", "", response).strip()
+
+        print("Response generated:", response)
+        
         return response
+
+    def web_search(self, query):
+        """Perform a DuckDuckGo search and return the top results."""
+        print(f"Performing web search for: {query}")
+        results = self.ddg_search.run(query)
+        return results
     
+
         # Generate a response using the language model
     def respond_to_mention(self, mention, mentioned_conversation_tweet):
         response_text = self.generate_response(mentioned_conversation_tweet.text)
@@ -127,16 +175,31 @@ class TwitterBot:
         # Get current time in UTC
         now = datetime.utcnow()
 
-        # Subtract 2 hours to get the start time
-        start_time = now - timedelta(minutes=20)
+        # Subtract 30 minutes to get the start time
+        start_time = now - timedelta(minutes=30)
 
         # Convert to required string format
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
         
-        return self.twitter_api.get_users_mentions(id=self.twitter_me_id,
-                                                   start_time=start_time_str,
-                                                   expansions=['referenced_tweets.id'],
-                                                   tweet_fields=['created_at', 'conversation_id']).data
+        print("Start logging into the twitterverse...")
+        response = self.twitter_api.get_users_mentions(
+            id=self.twitter_me_id,
+            start_time=start_time_str,
+            expansions=['referenced_tweets.id'],
+            tweet_fields=['created_at', 'conversation_id']
+        )
+
+        # Extract rate limit info from the response
+        rate_limit_remaining = response.meta.get('x-rate-limit-remaining', 'Unknown')
+        rate_limit_reset = response.meta.get('x-rate-limit-reset', 'Unknown')
+        
+        print(f"Rate limit remaining: {rate_limit_remaining}")
+        print(f"Rate limit reset time (Unix timestamp): {rate_limit_reset}")
+        
+        # Print raw mentions data
+        print(f"Raw mentions data: {response.data}")
+        
+        return response.data
 
     # Checking to see if we've already responded to a mention with what's logged in airtable
     def check_already_responded(self, mentioned_conversation_tweet_id):
@@ -180,9 +243,35 @@ def job():
     bot = TwitterBot()
     bot.execute_replies()
 
+def test_get_mentions():
+    bot = TwitterBot()
+    mentions = bot.get_mentions()
+    if mentions:
+        for mention in mentions:
+            print(f"Mention ID: {mention.id}, Text: {mention.text}")
+    else:
+        print("No mentions found.")
+
+
+# Method to test the web search
+def test_web_search():
+    bot = TwitterBot()
+    query = "does elon musks mother live in china"
+    results = bot.web_search(query)
+    print("Web Search Results:")
+    print(results)
+
+# if __name__ == "__main__":
+#     test_get_mentions()
+#     test_web_search()
+
+
+
 if __name__ == "__main__":
-    # Schedule the job to run every 5 minutes. Edit to your liking, but watch out for rate limits
-    schedule.every(6).minutes.do(job)
+    # Schedule the job to run every 20 minutes. Edit to your liking, but watch out for rate limits
+    schedule.every(20).minutes.do(job)
+    print("Starting up all systems...")
+    job()
     while True:
         schedule.run_pending()
         time.sleep(1)

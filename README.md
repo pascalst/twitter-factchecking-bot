@@ -1,10 +1,14 @@
 # Twitter Fact Checking Bot
 
-Hello, welcome to the Twitter fact checking bot. To run the bot please tag the bot below a tweet and get an as objective as possible fact check.
+Hello, welcome to the Twitter fact checking bot :) Since fact checking is currently not en vouge, we build a bot to take over the role. the bot takes the tweet it is mentioned on and checks it for accuracy using state-of-the-art LLMs. If the bot is unsure, it will search the web for up-to-date information. Therefore, it is using the DuckDuckGoGo API for preserving privacy.
 
-The bot is fully open source and feel free to fork and adjust.
+### Usage
+To active the bot please tag the bot on a tweet that you want to fact check and get an as objective as possible fact check.
 
-More details on how to run the bot in the upstream repo.
+The bot is fully open source and feel free to fork and adjust. It is build using the LangChain framework.
+
+### Adjusting the bot
+If you want to run the bot yourself, please check the upstream repo for instructions.
 
 More details might follow here.
 

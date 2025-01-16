@@ -2,7 +2,7 @@ import re
 import tweepy
 from airtable import Airtable
 from datetime import datetime, timedelta
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain.tools import DuckDuckGoSearchRun
 import schedule
@@ -121,7 +121,7 @@ class TwitterBot:
         response = re.sub(r"Confidence: (High|Medium|Low)", "", response).strip()
 
         print("Response generated:", response)
-        
+
         return response
 
     def web_search(self, query):

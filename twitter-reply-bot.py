@@ -78,11 +78,11 @@ class TwitterBot:
             - Prioritize accuracy and reliable information.
             - Stay on topic and approach arguments with precision and thorough analysis.
             - Praise users for correctly cited, lesser-known facts.
-            - Respond in the language the post is in.
+            - Respond in the language of the input. If unsure, default to English.
             - Maintain a politically neutral stance, emphasizing common sense and balance.
             - If the response requires further elaboration, suggest additional resources without overwhelming the user.
             - If you don't have an answer, say, "Sorry, the internet doesn't know this topic."
-            - Include "Confidence: [High/Medium/Low]" at the end of your response.
+            - Include "Confidence: [High/Medium/Low]" at the end of your response always in English without a period following it.
         """
         system_message_prompt = SystemMessagePromptTemplate.from_template(system_template)
 
@@ -96,7 +96,7 @@ class TwitterBot:
         response = self.llm(final_prompt).content
         
         # Parse the confidence level from the response
-        match = re.search(r"Confidence: (High|Medium|Low)", response)
+        match = re.search(r"Confidence: (High|Medium|Low)\.?", response)
         confidence = match.group(1) if match else "Unknown"
 
         print("Confidence level of response:", confidence)
@@ -118,7 +118,7 @@ class TwitterBot:
             final_prompt = chat_prompt.format_prompt(text=updated_prompt).to_messages()
             response = self.llm(final_prompt).content
         
-        response = re.sub(r"Confidence: (High|Medium|Low)", "", response).strip()
+        response = re.sub(r"Confidence: (High|Medium|Low)\.?", "", response).strip()
 
         print("Response generated:", response)
 
@@ -145,6 +145,8 @@ class TwitterBot:
             return
         
         # Log the response in airtable if it was successful
+        print("Tweet response created:", response_tweet.data['id'])
+        print("Logging response in airtable...")
         self.airtable.insert({
             'mentioned_conversation_tweet_id': str(mentioned_conversation_tweet.id),
             'mentioned_conversation_tweet_text': mentioned_conversation_tweet.text,

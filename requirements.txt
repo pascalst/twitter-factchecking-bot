@@ -21,7 +21,7 @@ hpack==4.0.0
 hyperframe==6.0.1
 idna==3.4
 importlib-metadata==6.6.0
-langchain==0.0.181
+langchain>=0.0.200
 markdown-it-py==2.2.0
 marshmallow==3.19.0
 marshmallow-enum==1.5.1
